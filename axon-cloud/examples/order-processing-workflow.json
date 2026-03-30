@@ -1,0 +1,578 @@
+{
+  "id": "wf_order_processing_v1",
+  "name": "E-Commerce Order Processing",
+  "description": "End-to-end order processing workflow that validates inventory, calculates pricing, and notifies customers and fulfillment systems. Demonstrates all 12 node types in a realistic production scenario.",
+  "version": "1.0.0",
+  "tags": ["ecommerce", "orders", "fulfillment", "example"],
+  "created_at": "2024-01-15T00:00:00Z",
+  "nodes": [
+    {
+      "id": "node_trigger_order",
+      "type": "trigger",
+      "name": "New Order Received",
+      "description": "Fires when a new order webhook arrives from the storefront. Validates the incoming payload and starts the processing pipeline.",
+      "position": { "x": 100, "y": 300 },
+      "config": {
+        "trigger_type": "webhook",
+        "method": "POST",
+        "path": "/webhooks/orders/new",
+        "auth": {
+          "type": "hmac_sha256",
+          "secret_env": "STOREFRONT_WEBHOOK_SECRET",
+          "header": "X-Webhook-Signature"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["order_id", "customer_id", "items", "shipping_address"],
+          "properties": {
+            "order_id":        { "type": "string", "example": "ORD-20240115-8821" },
+            "customer_id":     { "type": "string", "example": "cust_a3f9b2" },
+            "currency":        { "type": "string", "enum": ["USD", "EUR", "GBP"], "default": "USD" },
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["sku", "quantity", "unit_price"],
+                "properties": {
+                  "sku":        { "type": "string" },
+                  "name":       { "type": "string" },
+                  "quantity":   { "type": "integer", "minimum": 1 },
+                  "unit_price": { "type": "number", "minimum": 0 }
+                }
+              }
+            },
+            "shipping_address": {
+              "type": "object",
+              "required": ["line1", "city", "country", "postal_code"],
+              "properties": {
+                "line1":       { "type": "string" },
+                "line2":       { "type": "string" },
+                "city":        { "type": "string" },
+                "state":       { "type": "string" },
+                "country":     { "type": "string" },
+                "postal_code": { "type": "string" }
+              }
+            },
+            "promo_code": { "type": "string" }
+          }
+        },
+        "sample_payload": {
+          "order_id": "ORD-20240115-8821",
+          "customer_id": "cust_a3f9b2",
+          "currency": "USD",
+          "items": [
+            { "sku": "WIDGET-PRO-BLK", "name": "Pro Widget Black", "quantity": 2, "unit_price": 49.99 },
+            { "sku": "GADGET-MINI-SLV", "name": "Mini Gadget Silver", "quantity": 1, "unit_price": 29.99 }
+          ],
+          "shipping_address": {
+            "line1": "742 Evergreen Terrace",
+            "city": "Springfield",
+            "state": "IL",
+            "country": "US",
+            "postal_code": "62701"
+          },
+          "promo_code": "SAVE10"
+        }
+      },
+      "outputs": {
+        "order": "{{trigger.body}}"
+      }
+    },
+
+    {
+      "id": "node_http_customer",
+      "type": "http_request",
+      "name": "Fetch Customer Profile",
+      "description": "Retrieves full customer profile from the CRM API, including loyalty tier, tax exemption status, and preferred contact method.",
+      "position": { "x": 340, "y": 300 },
+      "config": {
+        "method": "GET",
+        "url": "{{env.CRM_API_BASE_URL}}/v2/customers/{{nodes.node_trigger_order.outputs.order.customer_id}}",
+        "headers": {
+          "Authorization": "Bearer {{env.CRM_API_KEY}}",
+          "Accept": "application/json",
+          "X-Request-ID": "{{workflow.run_id}}"
+        },
+        "timeout_ms": 5000,
+        "retry": {
+          "max_attempts": 3,
+          "backoff": "exponential",
+          "backoff_base_ms": 500,
+          "retry_on_status": [429, 502, 503, 504]
+        },
+        "on_error": "fail_workflow"
+      },
+      "outputs": {
+        "customer": "{{response.body}}"
+      },
+      "sample_response": {
+        "id": "cust_a3f9b2",
+        "email": "jane.doe@example.com",
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "loyalty_tier": "gold",
+        "tax_exempt": false,
+        "preferred_contact": "email",
+        "phone": "+1-555-0142",
+        "lifetime_value_usd": 1840.50
+      }
+    },
+
+    {
+      "id": "node_db_inventory",
+      "type": "database",
+      "name": "Query Inventory Levels",
+      "description": "Checks current stock levels for every SKU in the order against the inventory PostgreSQL database. Returns available quantity and warehouse location for each item.",
+      "position": { "x": 340, "y": 500 },
+      "config": {
+        "connection": "{{env.INVENTORY_DB_URL}}",
+        "driver": "postgresql",
+        "operation": "query",
+        "query": "SELECT sku, available_qty, warehouse_id, reorder_threshold FROM inventory WHERE sku = ANY($1::text[]) FOR UPDATE SKIP LOCKED",
+        "params": [
+          "{{nodes.node_trigger_order.outputs.order.items | map('sku')}}"
+        ],
+        "timeout_ms": 8000,
+        "pool": {
+          "min": 2,
+          "max": 10
+        },
+        "on_error": "fail_workflow"
+      },
+      "outputs": {
+        "inventory_rows": "{{result.rows}}"
+      },
+      "sample_response": {
+        "rows": [
+          { "sku": "WIDGET-PRO-BLK",  "available_qty": 14, "warehouse_id": "WH-EAST-01", "reorder_threshold": 5 },
+          { "sku": "GADGET-MINI-SLV", "available_qty": 0,  "warehouse_id": "WH-EAST-01", "reorder_threshold": 10 }
+        ],
+        "row_count": 2
+      }
+    },
+
+    {
+      "id": "node_transform_enrich",
+      "type": "transform",
+      "name": "Enrich Order with Customer & Inventory",
+      "description": "Merges the raw order payload with the customer profile and inventory data into a single enriched order object. Also indexes inventory by SKU for O(1) lookups in downstream nodes.",
+      "position": { "x": 580, "y": 400 },
+      "config": {
+        "language": "jmespath",
+        "mapping": {
+          "order_id":        "{{nodes.node_trigger_order.outputs.order.order_id}}",
+          "currency":        "{{nodes.node_trigger_order.outputs.order.currency}}",
+          "promo_code":      "{{nodes.node_trigger_order.outputs.order.promo_code}}",
+          "shipping_address":"{{nodes.node_trigger_order.outputs.order.shipping_address}}",
+          "customer": {
+            "id":              "{{nodes.node_http_customer.outputs.customer.id}}",
+            "email":           "{{nodes.node_http_customer.outputs.customer.email}}",
+            "first_name":      "{{nodes.node_http_customer.outputs.customer.first_name}}",
+            "last_name":       "{{nodes.node_http_customer.outputs.customer.last_name}}",
+            "loyalty_tier":    "{{nodes.node_http_customer.outputs.customer.loyalty_tier}}",
+            "tax_exempt":      "{{nodes.node_http_customer.outputs.customer.tax_exempt}}",
+            "preferred_contact":"{{nodes.node_http_customer.outputs.customer.preferred_contact}}"
+          },
+          "items":           "{{nodes.node_trigger_order.outputs.order.items}}",
+          "inventory_by_sku": "{{nodes.node_db_inventory.outputs.inventory_rows | key_by('sku')}}",
+          "all_items_in_stock": "{{nodes.node_trigger_order.outputs.order.items | all_satisfy(item, nodes.node_db_inventory.outputs.inventory_rows | find_by('sku', item.sku) | get('available_qty') >= item.quantity)}}"
+        }
+      },
+      "outputs": {
+        "enriched_order": "{{result}}"
+      }
+    },
+
+    {
+      "id": "node_condition_stock",
+      "type": "condition",
+      "name": "All Items In Stock?",
+      "description": "Evaluates whether every ordered item has sufficient inventory. Routes to the in-stock fulfillment path if true, or the backorder/out-of-stock path if false.",
+      "position": { "x": 820, "y": 400 },
+      "config": {
+        "expression": "{{nodes.node_transform_enrich.outputs.enriched_order.all_items_in_stock}} == true",
+        "true_label": "In Stock",
+        "false_label": "Out of Stock / Backorder"
+      },
+      "outputs": {
+        "result": "{{expression_result}}",
+        "branch": "{{expression_result == true ? 'in_stock' : 'out_of_stock'}}"
+      }
+    },
+
+    {
+      "id": "node_split_branches",
+      "type": "split",
+      "name": "Split: Stock vs Backorder Paths",
+      "description": "Fans out execution into two independent branches based on the stock check result. Both branches eventually converge at the merge node before sending customer notifications.",
+      "position": { "x": 1060, "y": 400 },
+      "config": {
+        "mode": "conditional",
+        "branches": [
+          {
+            "id": "branch_in_stock",
+            "label": "In Stock Path",
+            "condition": "{{nodes.node_condition_stock.outputs.branch}} == 'in_stock'",
+            "next_node": "node_loop_items"
+          },
+          {
+            "id": "branch_out_of_stock",
+            "label": "Out of Stock / Backorder Path",
+            "condition": "{{nodes.node_condition_stock.outputs.branch}} == 'out_of_stock'",
+            "next_node": "node_http_backorder"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "node_loop_items",
+      "type": "loop",
+      "name": "Process Each Order Item",
+      "description": "Iterates over every item in the order to reserve inventory, apply per-item discounts, and build the line-item detail list that feeds into the price calculation node.",
+      "position": { "x": 1300, "y": 250 },
+      "config": {
+        "iterate_over": "{{nodes.node_transform_enrich.outputs.enriched_order.items}}",
+        "item_variable": "current_item",
+        "index_variable": "item_index",
+        "max_iterations": 100,
+        "parallel": false,
+        "body_nodes": ["node_code_price"],
+        "accumulate_output": true,
+        "output_variable": "processed_items"
+      },
+      "outputs": {
+        "processed_items": "{{loop.accumulated_results}}"
+      }
+    },
+
+    {
+      "id": "node_code_price",
+      "type": "code",
+      "name": "Calculate Item Price with Tax & Discounts",
+      "description": "Runs inline JavaScript to compute the final line-item price. Applies loyalty-tier discounts (gold=10%, silver=5%), promo code reductions, and destination-based tax rates. Executed once per loop iteration.",
+      "position": { "x": 1540, "y": 250 },
+      "config": {
+        "runtime": "javascript",
+        "timeout_ms": 3000,
+        "memory_mb": 128,
+        "code": "// ─── Inputs injected by the workflow engine ───────────────────────────────\nconst item        = context.current_item;          // { sku, name, quantity, unit_price }\nconst order       = context.enriched_order;        // full enriched order object\nconst customer    = order.customer;\nconst promoCode   = order.promo_code || '';\n\n// ─── Loyalty tier discount ────────────────────────────────────────────────\nconst TIER_DISCOUNTS = { gold: 0.10, silver: 0.05, bronze: 0.02, standard: 0 };\nconst tierDiscount = TIER_DISCOUNTS[customer.loyalty_tier] || 0;\n\n// ─── Promo code discount ──────────────────────────────────────────────────\nconst PROMO_CODES = { SAVE10: 0.10, SAVE20: 0.20, WELCOME: 0.15 };\nconst promoDiscount = PROMO_CODES[promoCode.toUpperCase()] || 0;\n\n// Discounts stack additively, capped at 30%\nconst totalDiscount = Math.min(tierDiscount + promoDiscount, 0.30);\n\n// ─── Tax rate by destination country ─────────────────────────────────────\nconst TAX_RATES = { US: 0.08, GB: 0.20, DE: 0.19, FR: 0.20, CA: 0.13 };\nconst country   = order.shipping_address.country || 'US';\nconst taxRate   = customer.tax_exempt ? 0 : (TAX_RATES[country] || 0.08);\n\n// ─── Line-item calculation ────────────────────────────────────────────────\nconst basePrice      = item.unit_price * item.quantity;\nconst discountAmount = parseFloat((basePrice * totalDiscount).toFixed(2));\nconst taxableAmount  = basePrice - discountAmount;\nconst taxAmount      = parseFloat((taxableAmount * taxRate).toFixed(2));\nconst lineTotal      = parseFloat((taxableAmount + taxAmount).toFixed(2));\n\nreturn {\n  sku:             item.sku,\n  name:            item.name,\n  quantity:        item.quantity,\n  unit_price:      item.unit_price,\n  base_price:      basePrice,\n  discount_pct:    totalDiscount,\n  discount_amount: discountAmount,\n  tax_rate:        taxRate,\n  tax_amount:      taxAmount,\n  line_total:      lineTotal\n};\n",
+        "input_bindings": {
+          "current_item":   "{{loop.current_item}}",
+          "enriched_order": "{{nodes.node_transform_enrich.outputs.enriched_order}}"
+        }
+      },
+      "outputs": {
+        "line_item": "{{code.return_value}}"
+      }
+    },
+
+    {
+      "id": "node_http_backorder",
+      "type": "http_request",
+      "name": "Register Backorder with Supplier",
+      "description": "Calls the supplier API to create a backorder for out-of-stock items. Returns an estimated restock date that is included in the customer notification.",
+      "position": { "x": 1300, "y": 560 },
+      "config": {
+        "method": "POST",
+        "url": "{{env.SUPPLIER_API_BASE_URL}}/v1/backorders",
+        "headers": {
+          "Authorization": "Bearer {{env.SUPPLIER_API_KEY}}",
+          "Content-Type": "application/json",
+          "X-Request-ID": "{{workflow.run_id}}"
+        },
+        "body": {
+          "reference_order_id": "{{nodes.node_trigger_order.outputs.order.order_id}}",
+          "items": "{{nodes.node_transform_enrich.outputs.enriched_order.items | filter(item, nodes.node_transform_enrich.outputs.enriched_order.inventory_by_sku[item.sku].available_qty < item.quantity)}}",
+          "priority": "standard",
+          "notify_url": "{{env.APP_BASE_URL}}/webhooks/backorder-update"
+        },
+        "timeout_ms": 8000,
+        "retry": {
+          "max_attempts": 2,
+          "backoff": "linear",
+          "backoff_base_ms": 1000,
+          "retry_on_status": [429, 502, 503, 504]
+        },
+        "on_error": "continue",
+        "on_error_default": {
+          "backorder_id": null,
+          "estimated_restock_date": null,
+          "status": "backorder_failed"
+        }
+      },
+      "outputs": {
+        "backorder": "{{response.body}}"
+      },
+      "sample_response": {
+        "backorder_id": "BO-20240115-0042",
+        "status": "confirmed",
+        "estimated_restock_date": "2024-01-22",
+        "items": [
+          { "sku": "GADGET-MINI-SLV", "quantity_requested": 1, "estimated_qty": 1 }
+        ]
+      }
+    },
+
+    {
+      "id": "node_merge_branches",
+      "type": "merge",
+      "name": "Merge In-Stock & Backorder Results",
+      "description": "Waits for whichever branch (in-stock loop or backorder registration) completed and assembles the final order summary object used by all downstream notification nodes.",
+      "position": { "x": 1780, "y": 400 },
+      "config": {
+        "strategy": "first_completed",
+        "wait_for_branches": ["branch_in_stock", "branch_out_of_stock"],
+        "timeout_ms": 30000,
+        "output_mapping": {
+          "order_id":      "{{nodes.node_trigger_order.outputs.order.order_id}}",
+          "customer":      "{{nodes.node_transform_enrich.outputs.enriched_order.customer}}",
+          "currency":      "{{nodes.node_transform_enrich.outputs.enriched_order.currency}}",
+          "line_items":    "{{nodes.node_loop_items.outputs.processed_items | default([])}}",
+          "backorder_info":"{{nodes.node_http_backorder.outputs.backorder | default(null)}}",
+          "fulfillment_status": "{{nodes.node_condition_stock.outputs.branch == 'in_stock' ? 'confirmed' : 'backordered'}}",
+          "grand_total":   "{{nodes.node_loop_items.outputs.processed_items | sum('line_total') | default(0) | round(2)}}",
+          "total_tax":     "{{nodes.node_loop_items.outputs.processed_items | sum('tax_amount') | default(0) | round(2)}}",
+          "total_discount":"{{nodes.node_loop_items.outputs.processed_items | sum('discount_amount') | default(0) | round(2)}}"
+        }
+      },
+      "outputs": {
+        "order_summary": "{{merge.result}}"
+      }
+    },
+
+    {
+      "id": "node_delay_confirmation",
+      "type": "delay",
+      "name": "Brief Delay Before Notification",
+      "description": "Introduces a short pause to allow any in-flight database writes (inventory reservation, order record creation) to fully commit before the confirmation email is dispatched. Prevents customers from receiving a confirmation before the order is fully persisted.",
+      "position": { "x": 2020, "y": 400 },
+      "config": {
+        "duration": 3,
+        "unit": "seconds",
+        "jitter_ms": 500,
+        "skip_in_test_mode": true
+      }
+    },
+
+    {
+      "id": "node_email_confirmation",
+      "type": "email",
+      "name": "Send Order Confirmation Email",
+      "description": "Dispatches a transactional confirmation email to the customer. Uses different subject lines and body templates depending on whether the order is fully confirmed or partially backordered.",
+      "position": { "x": 2260, "y": 300 },
+      "config": {
+        "provider": "{{env.EMAIL_PROVIDER}}",
+        "from": {
+          "address": "orders@{{env.EMAIL_DOMAIN}}",
+          "name": "{{env.STORE_NAME}} Orders"
+        },
+        "to": [
+          {
+            "address": "{{nodes.node_merge_branches.outputs.order_summary.customer.email}}",
+            "name": "{{nodes.node_merge_branches.outputs.order_summary.customer.first_name}} {{nodes.node_merge_branches.outputs.order_summary.customer.last_name}}"
+          }
+        ],
+        "subject": "{{nodes.node_merge_branches.outputs.order_summary.fulfillment_status == 'confirmed' ? 'Your order ' + nodes.node_merge_branches.outputs.order_summary.order_id + ' is confirmed!' : 'Order ' + nodes.node_merge_branches.outputs.order_summary.order_id + ' received — some items on backorder'}}",
+        "template_id": "{{nodes.node_merge_branches.outputs.order_summary.fulfillment_status == 'confirmed' ? env.EMAIL_TEMPLATE_CONFIRMED : env.EMAIL_TEMPLATE_BACKORDER}}",
+        "template_variables": {
+          "customer_first_name":  "{{nodes.node_merge_branches.outputs.order_summary.customer.first_name}}",
+          "order_id":             "{{nodes.node_merge_branches.outputs.order_summary.order_id}}",
+          "fulfillment_status":   "{{nodes.node_merge_branches.outputs.order_summary.fulfillment_status}}",
+          "line_items":           "{{nodes.node_merge_branches.outputs.order_summary.line_items}}",
+          "grand_total":          "{{nodes.node_merge_branches.outputs.order_summary.grand_total}}",
+          "total_tax":            "{{nodes.node_merge_branches.outputs.order_summary.total_tax}}",
+          "total_discount":       "{{nodes.node_merge_branches.outputs.order_summary.total_discount}}",
+          "currency":             "{{nodes.node_merge_branches.outputs.order_summary.currency}}",
+          "estimated_restock_date": "{{nodes.node_merge_branches.outputs.order_summary.backorder_info.estimated_restock_date | default('TBD')}}",
+          "shipping_address":     "{{nodes.node_transform_enrich.outputs.enriched_order.shipping_address}}",
+          "support_email":        "{{env.SUPPORT_EMAIL}}"
+        },
+        "reply_to": "{{env.SUPPORT_EMAIL}}",
+        "tags": ["transactional", "order-confirmation"],
+        "on_error": "continue"
+      },
+      "outputs": {
+        "email_result": "{{send_result}}"
+      }
+    },
+
+    {
+      "id": "node_webhook_fulfillment",
+      "type": "webhook",
+      "name": "Notify Fulfillment System",
+      "description": "Pushes the completed order summary to the external warehouse management system (WMS) via an outbound webhook. The WMS uses this event to generate pick lists, packing slips, and shipping labels.",
+      "position": { "x": 2260, "y": 500 },
+      "config": {
+        "url": "{{env.FULFILLMENT_WEBHOOK_URL}}",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Axon-Signature": "{{webhook.hmac_sha256(env.FULFILLMENT_WEBHOOK_SECRET, payload)}}",
+          "X-Axon-Workflow-Run": "{{workflow.run_id}}",
+          "X-Axon-Timestamp": "{{workflow.started_at}}"
+        },
+        "payload": {
+          "event":            "order.ready_for_fulfillment",
+          "schema_version":   "2024-01",
+          "order_id":         "{{nodes.node_merge_branches.outputs.order_summary.order_id}}",
+          "fulfillment_status":"{{nodes.node_merge_branches.outputs.order_summary.fulfillment_status}}",
+          "customer": {
+            "id":    "{{nodes.node_merge_branches.outputs.order_summary.customer.id}}",
+            "email": "{{nodes.node_merge_branches.outputs.order_summary.customer.email}}"
+          },
+          "line_items":       "{{nodes.node_merge_branches.outputs.order_summary.line_items}}",
+          "grand_total":      "{{nodes.node_merge_branches.outputs.order_summary.grand_total}}",
+          "currency":         "{{nodes.node_merge_branches.outputs.order_summary.currency}}",
+          "shipping_address": "{{nodes.node_transform_enrich.outputs.enriched_order.shipping_address}}",
+          "backorder_info":   "{{nodes.node_merge_branches.outputs.order_summary.backorder_info}}",
+          "workflow_run_id":  "{{workflow.run_id}}"
+        },
+        "timeout_ms": 10000,
+        "retry": {
+          "max_attempts": 5,
+          "backoff": "exponential",
+          "backoff_base_ms": 1000,
+          "max_backoff_ms": 30000,
+          "retry_on_status": [429, 500, 502, 503, 504]
+        },
+        "expect_status": [200, 201, 202],
+        "on_error": "continue"
+      },
+      "outputs": {
+        "fulfillment_ack": "{{response.body}}"
+      }
+    }
+  ],
+
+  "edges": [
+    {
+      "id": "edge_trigger_to_http",
+      "from": "node_trigger_order",
+      "to":   "node_http_customer",
+      "label": "Order received"
+    },
+    {
+      "id": "edge_trigger_to_db",
+      "from": "node_trigger_order",
+      "to":   "node_db_inventory",
+      "label": "Check inventory"
+    },
+    {
+      "id": "edge_http_to_transform",
+      "from": "node_http_customer",
+      "to":   "node_transform_enrich",
+      "label": "Customer profile fetched"
+    },
+    {
+      "id": "edge_db_to_transform",
+      "from": "node_db_inventory",
+      "to":   "node_transform_enrich",
+      "label": "Inventory levels fetched"
+    },
+    {
+      "id": "edge_transform_to_condition",
+      "from": "node_transform_enrich",
+      "to":   "node_condition_stock",
+      "label": "Enriched order ready"
+    },
+    {
+      "id": "edge_condition_to_split",
+      "from": "node_condition_stock",
+      "to":   "node_split_branches",
+      "label": "Stock check complete"
+    },
+    {
+      "id": "edge_split_to_loop",
+      "from": "node_split_branches",
+      "to":   "node_loop_items",
+      "branch": "branch_in_stock",
+      "label": "In stock"
+    },
+    {
+      "id": "edge_split_to_backorder",
+      "from": "node_split_branches",
+      "to":   "node_http_backorder",
+      "branch": "branch_out_of_stock",
+      "label": "Out of stock"
+    },
+    {
+      "id": "edge_loop_to_code",
+      "from": "node_loop_items",
+      "to":   "node_code_price",
+      "label": "Per-item iteration"
+    },
+    {
+      "id": "edge_loop_to_merge",
+      "from": "node_loop_items",
+      "to":   "node_merge_branches",
+      "branch": "branch_in_stock",
+      "label": "All items processed"
+    },
+    {
+      "id": "edge_backorder_to_merge",
+      "from": "node_http_backorder",
+      "to":   "node_merge_branches",
+      "branch": "branch_out_of_stock",
+      "label": "Backorder registered"
+    },
+    {
+      "id": "edge_merge_to_delay",
+      "from": "node_merge_branches",
+      "to":   "node_delay_confirmation",
+      "label": "Order summary assembled"
+    },
+    {
+      "id": "edge_delay_to_email",
+      "from": "node_delay_confirmation",
+      "to":   "node_email_confirmation",
+      "label": "Delay elapsed"
+    },
+    {
+      "id": "edge_delay_to_webhook",
+      "from": "node_delay_confirmation",
+      "to":   "node_webhook_fulfillment",
+      "label": "Delay elapsed"
+    }
+  ],
+
+  "environment_variables": {
+    "required": [
+      { "key": "CRM_API_BASE_URL",          "description": "Base URL of the CRM REST API, e.g. https://crm.example.com" },
+      { "key": "CRM_API_KEY",               "description": "Bearer token for CRM API authentication" },
+      { "key": "INVENTORY_DB_URL",          "description": "PostgreSQL connection string for the inventory database" },
+      { "key": "SUPPLIER_API_BASE_URL",     "description": "Base URL of the supplier backorder API" },
+      { "key": "SUPPLIER_API_KEY",          "description": "Bearer token for supplier API authentication" },
+      { "key": "FULFILLMENT_WEBHOOK_URL",   "description": "Outbound webhook URL for the warehouse management system" },
+      { "key": "FULFILLMENT_WEBHOOK_SECRET","description": "HMAC secret used to sign outbound fulfillment webhook payloads" },
+      { "key": "STOREFRONT_WEBHOOK_SECRET", "description": "HMAC secret used to verify inbound storefront webhook signatures" },
+      { "key": "EMAIL_PROVIDER",            "description": "Email provider identifier, e.g. sendgrid, mailgun, ses" },
+      { "key": "EMAIL_DOMAIN",              "description": "Sending domain, e.g. mystore.com" },
+      { "key": "STORE_NAME",                "description": "Human-readable store name used in email From header" },
+      { "key": "EMAIL_TEMPLATE_CONFIRMED",  "description": "Template ID for the order-confirmed transactional email" },
+      { "key": "EMAIL_TEMPLATE_BACKORDER",  "description": "Template ID for the backorder notification email" },
+      { "key": "SUPPORT_EMAIL",             "description": "Customer support reply-to address" },
+      { "key": "APP_BASE_URL",              "description": "Public base URL of this application, used for callback URLs" }
+    ],
+    "optional": [
+      { "key": "LOG_LEVEL", "default": "info", "description": "Workflow engine log verbosity: debug | info | warn | error" }
+    ]
+  },
+
+  "settings": {
+    "timeout_ms": 120000,
+    "max_retries": 3,
+    "concurrency": 1,
+    "error_handling": {
+      "default_strategy": "fail_workflow",
+      "notify_on_failure": true,
+      "failure_webhook": "{{env.APP_BASE_URL}}/webhooks/workflow-failure"
+    },
+    "logging": {
+      "level": "{{env.LOG_LEVEL | default('info')}}",
+      "include_node_outputs": true,
+      "redact_fields": ["Authorization", "X-Axon-Signature", "password", "secret"]
+    }
+  }
+}
