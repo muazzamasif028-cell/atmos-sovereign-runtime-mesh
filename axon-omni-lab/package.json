@@ -1,0 +1,47 @@
+{
+  "name": "axon-omni-lab",
+  "version": "1.0.0",
+  "description": "The Living Platform — 12 elements, one organism",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node services/face-service/index.js",
+    "start:face": "node services/face-service/index.js",
+    "start:brain": "node services/brain-service/index.js",
+    "start:hands": "node services/hands-service/index.js",
+    "start:voice": "node services/voice-service/index.js",
+    "start:consciousness": "node services/consciousness-service/index.js",
+    "start:wisdom": "node services/wisdom-service/index.js",
+    "start:reflexes": "node services/reflexes-service/index.js",
+    "start:nervous": "node services/nervous-system-service/index.js",
+    "start:growth": "node services/growth-service/index.js",
+    "start:skeleton": "node services/skeleton-service/index.js",
+    "start:skin": "node services/skin-service/index.js",
+    "start:dna": "node services/dna-service/index.js",
+    "install:all": "for dir in services/*/; do echo \"Installing $dir\" && (cd \"$dir\" && npm install); done",
+    "health": "curl -s http://localhost:3000/api/health | node -e \"const d=require('fs').readFileSync('/dev/stdin','utf8'); const j=JSON.parse(d); console.log('Overall:', j.overall, '| Healthy:', j.healthy+'/'+j.total);\"",
+    "db:migrate": "psql $DATABASE_URL -f db/schema.sql",
+    "db:seed": "psql $DATABASE_URL -f db/seed.sql"
+  },
+  "workspaces": [
+    "services/*"
+  ],
+  "keywords": [
+    "axon",
+    "omni-lab",
+    "ai",
+    "automation",
+    "workflow",
+    "microservices",
+    "deepseek",
+    "gpt4o",
+    "pinecone",
+    "stripe",
+    "slack"
+  ],
+  "author": "Axon Omni Lab",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
