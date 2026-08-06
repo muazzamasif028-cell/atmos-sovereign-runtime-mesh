@@ -1,0 +1,260 @@
+{
+  "name": "axon-omni-lab",
+  "description": "The Living Platform — 12 elements, one organism",
+  "services": [
+    {
+      "name": "face-service",
+      "path": "services/face-service",
+      "port": 3000,
+      "element": 12,
+      "bodyPart": "Face",
+      "description": "Dashboard UI & API Gateway",
+      "env": {
+        "PORT": "3000",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.5",
+        "memory": "512Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 5
+      }
+    },
+    {
+      "name": "brain-service",
+      "path": "services/brain-service",
+      "port": 3001,
+      "element": 4,
+      "bodyPart": "Brain",
+      "description": "AI Inference Engine",
+      "env": {
+        "PORT": "3001",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "1.0",
+        "memory": "1Gi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 10
+      }
+    },
+    {
+      "name": "hands-service",
+      "path": "services/hands-service",
+      "port": 3002,
+      "element": 8,
+      "bodyPart": "Hands",
+      "description": "Third-party Integrations",
+      "env": {
+        "PORT": "3002",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.25",
+        "memory": "256Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    {
+      "name": "voice-service",
+      "path": "services/voice-service",
+      "port": 3003,
+      "element": 6,
+      "bodyPart": "Voice",
+      "description": "Natural Language Processing",
+      "env": {
+        "PORT": "3003",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.5",
+        "memory": "512Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 5
+      }
+    },
+    {
+      "name": "consciousness-service",
+      "path": "services/consciousness-service",
+      "port": 3004,
+      "element": 5,
+      "bodyPart": "Consciousness",
+      "description": "Context & Conversation Memory",
+      "env": {
+        "PORT": "3004",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.25",
+        "memory": "512Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 5
+      }
+    },
+    {
+      "name": "wisdom-service",
+      "path": "services/wisdom-service",
+      "port": 3005,
+      "element": 7,
+      "bodyPart": "Wisdom",
+      "description": "Vector Database & Knowledge Retrieval",
+      "env": {
+        "PORT": "3005",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.5",
+        "memory": "512Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 5
+      }
+    },
+    {
+      "name": "reflexes-service",
+      "path": "services/reflexes-service",
+      "port": 3006,
+      "element": 9,
+      "bodyPart": "Reflexes",
+      "description": "Workflow Automation Engine",
+      "env": {
+        "PORT": "3006",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.5",
+        "memory": "512Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 5
+      }
+    },
+    {
+      "name": "nervous-system-service",
+      "path": "services/nervous-system-service",
+      "port": 3007,
+      "element": 10,
+      "bodyPart": "Nervous System",
+      "description": "Message Queue & Inter-service Communication",
+      "env": {
+        "PORT": "3007",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.25",
+        "memory": "256Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    {
+      "name": "growth-service",
+      "path": "services/growth-service",
+      "port": 3008,
+      "element": 11,
+      "bodyPart": "Growth",
+      "description": "Auto-scaling & Load Balancing",
+      "env": {
+        "PORT": "3008",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.25",
+        "memory": "256Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 2
+      }
+    },
+    {
+      "name": "skeleton-service",
+      "path": "services/skeleton-service",
+      "port": 3009,
+      "element": 1,
+      "bodyPart": "Skeleton",
+      "description": "Infrastructure Orchestration",
+      "env": {
+        "PORT": "3009",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.1",
+        "memory": "128Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 1
+      }
+    },
+    {
+      "name": "skin-service",
+      "path": "services/skin-service",
+      "port": 3010,
+      "element": 2,
+      "bodyPart": "Skin",
+      "description": "Security & Cloudflare Integration",
+      "env": {
+        "PORT": "3010",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.25",
+        "memory": "256Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    {
+      "name": "dna-service",
+      "path": "services/dna-service",
+      "port": 3011,
+      "element": 3,
+      "bodyPart": "DNA",
+      "description": "PostgreSQL Persistence Layer",
+      "env": {
+        "PORT": "3011",
+        "NODE_ENV": "production"
+      },
+      "resources": {
+        "cpu": "0.5",
+        "memory": "512Mi"
+      },
+      "scaling": {
+        "min": 1,
+        "max": 5
+      }
+    }
+  ],
+  "databases": [
+    {
+      "name": "axon-postgres",
+      "type": "postgresql",
+      "version": "15",
+      "envVar": "DATABASE_URL"
+    },
+    {
+      "name": "axon-redis",
+      "type": "redis",
+      "version": "7",
+      "envVar": "REDIS_URL"
+    }
+  ]
+}

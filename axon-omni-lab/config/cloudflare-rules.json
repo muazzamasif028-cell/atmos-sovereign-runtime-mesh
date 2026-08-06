@@ -1,0 +1,122 @@
+{
+  "description": "Cloudflare WAF and security rules for Axon Omni Lab",
+  "zone": "your-domain.com",
+  "rules": [
+    {
+      "id": "block-sql-injection",
+      "name": "Block SQL Injection Attempts",
+      "expression": "(http.request.uri.query contains \"SELECT\" and http.request.uri.query contains \"FROM\") or (http.request.uri.query contains \"DROP TABLE\") or (http.request.uri.query contains \"UNION SELECT\")",
+      "action": "block",
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "id": "block-xss",
+      "name": "Block XSS Attempts",
+      "expression": "http.request.uri.query contains \"<script>\" or http.request.uri.query contains \"javascript:\" or http.request.uri.query contains \"onerror=\"",
+      "action": "block",
+      "enabled": true,
+      "priority": 2
+    },
+    {
+      "id": "block-path-traversal",
+      "name": "Block Path Traversal",
+      "expression": "http.request.uri.path contains \"../\" or http.request.uri.path contains \"..\\\\\" or http.request.uri.path contains \"/etc/passwd\"",
+      "action": "block",
+      "enabled": true,
+      "priority": 3
+    },
+    {
+      "id": "rate-limit-api",
+      "name": "Rate Limit API Endpoints",
+      "expression": "http.request.uri.path starts_with \"/api/\"",
+      "action": "challenge",
+      "rateLimit": {
+        "requestsPerPeriod": 100,
+        "period": 60,
+        "mitigationTimeout": 600
+      },
+      "enabled": true,
+      "priority": 10
+    },
+    {
+      "id": "rate-limit-ai",
+      "name": "Rate Limit AI Endpoints (expensive)",
+      "expression": "http.request.uri.path starts_with \"/api/brain/\"",
+      "action": "challenge",
+      "rateLimit": {
+        "requestsPerPeriod": 20,
+        "period": 60,
+        "mitigationTimeout": 300
+      },
+      "enabled": true,
+      "priority": 5
+    },
+    {
+      "id": "block-bad-bots",
+      "name": "Block Known Bad Bots",
+      "expression": "cf.client.bot and not cf.verified_bot_category in {\"search_engine\" \"monitoring\" \"security\"}",
+      "action": "block",
+      "enabled": true,
+      "priority": 15
+    },
+    {
+      "id": "allow-health-checks",
+      "name": "Allow Health Check Endpoints",
+      "expression": "http.request.uri.path eq \"/health\" or http.request.uri.path ends_with \"/health\"",
+      "action": "allow",
+      "enabled": true,
+      "priority": 0
+    },
+    {
+      "id": "challenge-suspicious-countries",
+      "name": "Challenge High-Risk Countries",
+      "expression": "ip.geoip.country in {\"XX\" \"YY\"}",
+      "action": "managed_challenge",
+      "enabled": false,
+      "priority": 20,
+      "note": "Enable and configure country codes as needed"
+    }
+  ],
+  "pageRules": [
+    {
+      "url": "*/api/*",
+      "settings": {
+        "cacheLevel": "bypass",
+        "ssl": "full_strict"
+      }
+    },
+    {
+      "url": "*/dashboard*",
+      "settings": {
+        "cacheLevel": "bypass",
+        "ssl": "full_strict"
+      }
+    }
+  ],
+  "securitySettings": {
+    "securityLevel": "medium",
+    "challengeTtl": 1800,
+    "browserCheck": true,
+    "hotlinkProtection": false,
+    "emailObfuscation": true,
+    "serverSideExcludes": true,
+    "waf": {
+      "enabled": true,
+      "mode": "block"
+    },
+    "ddosProtection": {
+      "enabled": true,
+      "level": "high"
+    },
+    "tls": {
+      "minVersion": "1.2",
+      "hsts": {
+        "enabled": true,
+        "maxAge": 31536000,
+        "includeSubdomains": true,
+        "preload": true
+      }
+    }
+  }
+}
