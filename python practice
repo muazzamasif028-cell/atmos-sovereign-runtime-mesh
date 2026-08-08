@@ -1,0 +1,59 @@
+print("Hello, SUPREME!")
+
+users = 1000
+print(users)
+
+users = 5000
+print(users)
+
+users = 1000
+print(users + 500)
+
+name = "SUPREME"
+print(name)
+
+name = "SUPREME"
+version = 1
+
+print(name)
+print(version)
+
+users = 1000
+new_users = 500
+
+total = users + new_users
+
+print(total)
+
+a = 10 
+b = 20
+
+print(a + b)
+
+users = 1000
+new_users = 250
+
+total = users + new_users
+
+print(total)
+
+users = 1000
+removed_users = 200
+
+remaining = users - removed_users
+
+print(remaining)
+
+a = 10 
+b = 5
+
+result = a * b
+
+print(result)
+
+servers = 1000
+users_per_server = 100
+
+capacity = server * users_per_server
+
+print(capacity)
