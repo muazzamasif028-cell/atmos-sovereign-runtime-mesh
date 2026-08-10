@@ -131,3 +131,9 @@ else:
 
 users = 500
 
+if users >= 1000:
+  print("SUPREME READY")
+
+else:
+   print("NOT READY")
+
