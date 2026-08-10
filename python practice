@@ -57,3 +57,77 @@ users_per_server = 100
 capacity = server * users_per_server
 
 print(capacity)
+
+a = 20
+b = 2
+
+result = a / b
+
+print(result)
+
+users = 1000
+servers = 10
+
+users_per_server = users / servers
+
+print(users_per_server)
+
+a = 10
+b = 3
+
+result = a % b
+
+print(result)
+
+a = 20
+b = 5
+
+result = a % b
+
+print(result)
+
+users = 10
+servers = 3
+
+remaining = users % servers 
+
+print(remaining)
+
+print(10 > 5)
+
+print(5 > 10)
+
+users = 1000
+
+print(users == 1000)
+print(users == 500)
+
+10 > 5
+5 < 10
+10 == 10
+10 != 5
+10 >= 10
+5 => 10
+
+users = 1000
+
+if users >= 1000:
+    print("SUPREME READY")
+
+users = 500
+
+if users >= 1000:
+   print("SUPREME READY")
+
+if a > b
+  print("yes")
+
+users = 1000
+
+if users = 1000:
+    print("SUPREME READY")
+else:
+     print("SUPREME BUILDING")
+
+users = 500
+
