@@ -1,18 +1,53 @@
-import express from 'express';
-const app = express();
-const PORT = process.env.PORT || 3000;
+print("Hello, SUPREME")
 
-app.get('/', (req, res) => {
-  res.send(`
-    <body style="background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 50px;">
-      <h1>ATMOS SOVEREIGN RUNTIME MESH</h1>
-      <hr style="border-color: #0f0; width: 50%;">
-      <p style="font-size: 20px;">STATUS: <span style="color: white; font-weight: bold;">NATURAL FLOW ACTIVE</span></p>
-      <p>All 4 Levels are Synchronized on Cloud</p>
-    </body>
-  `);
-});
+users = 1000
+print(users)
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Engine started on Port: ${PORT}`);
-});
+users = 5000
+print(users)
+
+name = "Supreme"
+print(name)
+
+name = "Supreme"
+version = 1
+
+users = 1000
+new_users = 500
+
+total = users + 500
+print(total)
+
+a = 20
+b = 10
+
+result = a + b
+
+print(result)
+
+users = 1000
+new_users = 250
+
+total = users + 500
+print(total)
+
+users = 1000
+removed_users = 200
+
+remaining = users - removed_users
+
+print(remaining)
+
+a = 30
+b = 10
+
+result = a * b
+
+print(result)
+
+users = 1000
+users_per_servers = 10
+
+capacity = users * users_per_servers
+
+print(capacity)
