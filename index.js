@@ -48,6 +48,35 @@ print(result)
 users = 1000
 users_per_servers = 10
 
-capacity = users * users_per_servers
+capacity = users * users_per_server 
 
 print(capacity)
+
+a = 20
+b = 4
+
+result = a / b
+
+print(result)
+
+users = 1000
+servers = 10
+
+users_per_ servers = users / servers 
+
+print(users_per_ servers)
+
+a = 10
+b = 3
+
+result = a % b
+
+print(result)
+
+users = 1000
+servers = 100
+
+remaining = users % servers 
+
+print(remaining)
+
