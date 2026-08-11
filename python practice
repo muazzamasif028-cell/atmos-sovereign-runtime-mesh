@@ -137,3 +137,29 @@ if users >= 1000:
 else:
    print("NOT READY")
 
+users = 1500
+
+if users >= 2000:
+    print("SUPREME ADVANCE")
+elif users >= 1000:
+    print("SUPREME READY")
+else:
+    print("SUPREME BUILDING")
+
+age = 20
+
+if age >= 18:
+    print("ADULT")
+elif age >= 13:
+    print("TEENAGER")
+else:
+    print("CHILD")
+
+users = 500
+
+if users >= 1000:
+    print("READY")
+elif users >= 500:
+    print("STARTING")
+else:
+    print("BUILDING")
