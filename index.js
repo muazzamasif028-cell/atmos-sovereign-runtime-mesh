@@ -80,3 +80,28 @@ remaining = users % servers
 
 print(remaining)
 
+print(10 > 5)
+
+print(5 < 10)
+
+users = 1000
+
+print(users == 1000)
+print(users == 500)
+
+10 > 5
+5 < 10
+10 == 10
+10 != 10
+10 >= 10
+5 => 10
+
+users = 1000
+if users >= 1000:
+
+   print("SUPREME READY")
+
+users = 500
+if users >= 1000:
+
+   print("SUPREME READY")
