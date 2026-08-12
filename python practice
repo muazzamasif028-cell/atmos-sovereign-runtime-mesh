@@ -215,3 +215,42 @@ if users >= 1000 or not active:
      print(Ready)
 else:
    print(Not Ready)
+
+users = [100, 200, 300, 400]
+print(users)
+
+users = [100, 200, 300, 400]
+
+print(users[0])
+print(users[1])
+print(users[2])
+
+users = [100, 200, 300]
+
+users.append(400)
+
+print(users)
+
+servers = [10, 20, 30, 40]
+print(servers)
+
+print(servers[0])
+print(servers[2])
+
+users.append[50]
+
+print(servers)
+
+users = [100, 200, 300, 400]
+
+users[0] = 500
+
+print(users)
+
+servers = [10, 20, 30, 40]
+
+servers[2] = 100
+
+print(servers)
+
+
