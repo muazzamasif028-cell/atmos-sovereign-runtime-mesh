@@ -163,3 +163,55 @@ elif users >= 500:
     print("STARTING")
 else:
     print("BUILDING")
+
+users = 1500
+active = True
+
+if users >= 1000 and active == True:
+    print("Supreme Ready")
+
+
+users = 2000
+active = False
+
+if users >= 1000 and active == True:
+    print("Supreme Ready")
+
+
+users = 1000
+active = True
+
+if users >= 1000 and active == True:
+    print("Ready")
+else:
+    print("Not Ready")
+
+users = 1500
+active = False
+
+if users >= 1000 or active == True:
+    print("SUPREME READY")
+
+users = 500
+active = True
+
+if users >= 1000 or active == True:
+    print("READY")
+else:
+    print("NOT READY")
+
+active = True
+print(not nctive)
+
+active = False
+
+if not active:
+     print(Account Inactive)
+
+users = 1000
+active = False
+
+if users >= 1000 or not active:
+     print(Ready)
+else:
+   print(Not Ready)
