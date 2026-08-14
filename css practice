@@ -1,0 +1,10 @@
+<h>Hello, Supreme!</h1>
+<p>Welcome to my platform.</p>
+
+h1 {
+    color: red;
+    front-side: 40px;
+}
+p {
+    color: blue;
+}
