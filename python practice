@@ -201,7 +201,7 @@ else:
     print("NOT READY")
 
 active = True
-print(not nctive)
+print(not active)
 
 active = False
 
